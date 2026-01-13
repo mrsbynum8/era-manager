@@ -25,7 +25,7 @@ export default function SuggestionsPage() {
             setResult(text);
             toast.success("Suggestions generated!");
         },
-        onError: () => toast.error("Failed to generate suggestions.")
+        onError: () => toast.error("Failed to generate suggestions.", { duration: Infinity })
     });
 
     return (

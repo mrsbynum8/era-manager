@@ -48,7 +48,7 @@ export default function NichesPage() {
             toast.success("Niche created successfully!");
         },
         onError: () => {
-            toast.error("Failed to create niche.");
+            toast.error("Failed to create niche.", { duration: Infinity });
         }
     });
 

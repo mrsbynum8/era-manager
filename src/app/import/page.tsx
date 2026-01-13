@@ -12,7 +12,7 @@ export default function ImportPage() {
 
     const handleImport = async () => {
         if (!text) {
-            toast.error("Please paste some design names first.");
+            toast.error("Please paste some design names first.", { duration: Infinity });
             return;
         }
 
@@ -38,12 +38,12 @@ export default function ImportPage() {
                 setText("");
                 toast.success(`Import complete! Added ${data.stats.added} new designs.`, { id: toastId });
             } else {
-                toast.error("Import failed.", { id: toastId });
+                toast.error("Import failed.", { id: toastId, duration: Infinity });
             }
 
         } catch (e: any) {
             console.error(e);
-            toast.error(e.message || "Failed to connect to server.", { id: toastId });
+            toast.error(e.message || "Failed to connect to server.", { id: toastId, duration: Infinity });
         } finally {
             setLoading(false);
         }

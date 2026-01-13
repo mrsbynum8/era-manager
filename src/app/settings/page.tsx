@@ -16,7 +16,7 @@ export default function SettingsPage() {
     const handleClearData = () => {
         if (confirm("Are you sure you want to clear all data? This cannot be undone!")) {
             // This would clear the data.json file
-            toast.error("Data clearing is not yet implemented");
+            toast.error("Data clearing is not yet implemented", { duration: Infinity });
         }
     };
 
@@ -127,6 +127,10 @@ export default function SettingsPage() {
                     <div className="flex justify-between">
                         <span className="text-muted-foreground">Storage</span>
                         <span className="text-white">Vercel Postgres</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">Framework</span>
+                        <span className="text-white">Next.js 14</span>
                     </div>
                 </div>
             </div>
