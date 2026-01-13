@@ -34,7 +34,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 
             const suggestions = unassigned
                 .filter(design => {
-                    const designLower = design.cleanName.toLowerCase();
+                    const designLower = (design.cleanName || design.name).toLowerCase();
                     return keywords.some(keyword => designLower.includes(keyword));
                 })
                 .slice(0, 10);
@@ -44,8 +44,9 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
         }
 
         // Use AI to analyze existing designs and suggest related ones
-        const existingDesigns = niche.designs.map(d => d.design.cleanName).slice(0, 30);
-        const unassignedNames = unassigned.map(d => d.cleanName);
+        // Note: For implicit M-N, niche.designs is Design[]
+        const existingDesigns = niche.designs.map(d => d.cleanName || d.name).slice(0, 30);
+        const unassignedNames = unassigned.map(d => d.cleanName || d.name);
 
         console.log(`[Suggestions] Using AI with ${existingDesigns.length} existing designs`);
 
@@ -107,12 +108,12 @@ INSTRUCTIONS:
             .map(name => {
                 const nameLower = name.toLowerCase();
                 // Try exact match first
-                let match = unassigned.find(d => d.cleanName.toLowerCase() === nameLower);
+                let match = unassigned.find(d => (d.cleanName || d.name).toLowerCase() === nameLower);
                 // Then try partial match
                 if (!match) {
-                    match = unassigned.find(d =>
-                        d.cleanName.toLowerCase().includes(nameLower) ||
-                        nameLower.includes(d.cleanName.toLowerCase())
+                    match = unassigned.find(d => 
+                        (d.cleanName || d.name).toLowerCase().includes(nameLower) ||
+                        nameLower.includes((d.cleanName || d.name).toLowerCase())
                     );
                 }
                 return match;

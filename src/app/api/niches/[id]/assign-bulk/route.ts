@@ -33,7 +33,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
             // Find best match
             const match = allDesigns.find(d =>
                 d.name.toLowerCase() === lowerClean ||
-                d.cleanName.toLowerCase() === lowerClean
+                (d.cleanName && d.cleanName.toLowerCase() === lowerClean)
             );
 
             if (match) {
