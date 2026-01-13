@@ -139,13 +139,10 @@ export class DatabaseAdapter {
     // --- Search/Organize ---
 
     async getUnassignedDesigns() {
-        return await prisma.design.findMany({
-            where: {
-                niches: {
-                    none: {}
-                }
-            }
+        const designs = await prisma.design.findMany({
+            include: { niches: true }
         });
+        return designs.filter(d => d.niches.length === 0);
     }
 
     async getDuplicateDesigns() {
