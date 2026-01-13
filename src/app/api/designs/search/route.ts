@@ -8,6 +8,6 @@ export async function GET(req: Request) {
 
     if (!q || q.length < 2) return NextResponse.json([]);
 
-    const designs = db.searchDesigns(q, excludeNiche);
+    const designs = await db.searchDesigns(q, excludeNiche);
     return NextResponse.json(designs);
 }

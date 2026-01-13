@@ -6,23 +6,21 @@ export async function GET(req: Request) {
     const type = searchParams.get("type");
 
     if (type === "duplicates") {
-        const allDesigns = db.getDesigns();
-        const allNiches = db.getNiches();
+        const duplicates = await db.getDuplicateDesigns();
 
-        // Filter helper
-        const duplicates = allDesigns
-            .filter(d => d.nicheIds.length > 1)
-            .map(d => ({
-                ...d,
-                niches: d.nicheIds.map(nid => ({
-                    niche: { name: allNiches.find(n => n.id === nid)?.name || "Unknown" }
-                }))
-            }));
+        // Map to match frontend expectation: niches: { niche: { name } }[]
+        // db.getDuplicateDesigns returns designs with `niches: Niche[]`
+        const mapped = duplicates.map((d: any) => ({
+            ...d,
+            niches: d.niches.map((n: any) => ({
+                niche: { name: n.name }
+            }))
+        }));
 
-        return NextResponse.json(duplicates);
+        return NextResponse.json(mapped);
     }
 
     // Default to unassigned
-    const unassigned = db.getUnassignedDesigns();
+    const unassigned = await db.getUnassignedDesigns();
     return NextResponse.json(unassigned);
 }

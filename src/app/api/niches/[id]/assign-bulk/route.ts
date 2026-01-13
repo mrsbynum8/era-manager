@@ -22,7 +22,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         const toAssign: string[] = []; // Store IDs of designs to assign
 
         // First pass: identify what exists and what needs to be created
-        let allDesigns = db.getDesigns();
+        let allDesigns = await db.getDesigns();
 
         for (const line of lines) {
             // Clean the input line exactly like we do during import
@@ -47,7 +47,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
         // Batch create missing designs
         if (toCreate.length > 0) {
-            const createdDesigns = db.addDesigns(toCreate);
+            const createdDesigns = await db.addDesigns(toCreate);
             for (const d of createdDesigns) {
                 toAssign.push(d.id);
                 stats.assigned.push(d.name);
@@ -56,7 +56,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
         // Now assign all designs to the niche
         for (const designId of toAssign) {
-            db.assignDesignToNiche(designId, nicheId);
+            await db.assignDesignToNiche(designId, nicheId);
         }
 
         return NextResponse.json(stats);
