@@ -3,6 +3,11 @@ import { PrismaClient } from '@prisma/client';
 // Prevent multiple instances of Prisma Client in development
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 
+console.log("Database Adapter Initializing...");
+console.log("NODE_ENV:", process.env.NODE_ENV);
+console.log("POSTGRES_PRISMA_URL exists:", !!process.env.POSTGRES_PRISMA_URL);
+console.log("POSTGRES_URL exists:", !!process.env.POSTGRES_URL);
+
 export const prisma = globalForPrisma.prisma || new PrismaClient();
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
@@ -18,12 +23,12 @@ export class DatabaseAdapter {
 
     async addDesigns(newDesigns: { name: string; cleanName: string }[]) {
         const results = [];
-        
+
         // Prisma doesn't support "createMany" with "skipDuplicates" on all DBs efficiently 
         // in a way that returns the created objects easily. 
         // For simplicity and to return the actual created objects, we'll loop.
         // In a high-volume prod environment, we'd optimize this.
-        
+
         for (const design of newDesigns) {
             try {
                 // Upsert to ensure we don't duplicate on name
@@ -35,7 +40,7 @@ export class DatabaseAdapter {
                         cleanName: design.cleanName,
                     }
                 });
-                
+
                 // Only add to results if it was just created (approximate check based on timestamps would be complex)
                 // For this use case, we want to know what we "processed" primarily.
                 // But the calling code expects "added" designs.
@@ -56,13 +61,13 @@ export class DatabaseAdapter {
         const existingSet = new Set(existing.map(d => d.name));
 
         const toCreate = newDesigns.filter(d => !existingSet.has(d.name));
-        
+
         if (toCreate.length === 0) return [];
 
         // Transaction for bulk creation to ensure atomicity isn't strictly required but good practice.
         // `createMany` is fastest but doesn't return the objects (IDs) in standard SQL without `returning`.
         // Prisma `createMany` returns a count.
-        
+
         // We will simple map create promises.
         const createdParams = await prisma.$transaction(
             toCreate.map(d => prisma.design.create({
@@ -148,7 +153,7 @@ export class DatabaseAdapter {
         // But for this app size, we can fetch logic or use a specific filter if supported.
         // Easier: Fetch all designs with niches, filter in memory. 
         // Or better: Use Raw Query for performance, but stick to Prisma for simplicity if dataset < 10k.
-        
+
         // We can use:
         const designs = await prisma.design.findMany({
             include: { niches: true }
