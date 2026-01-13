@@ -17,10 +17,7 @@ type NicheDetail = {
     id: string;
     name: string;
     description: string | null;
-    designs: {
-        design: Design;
-        assignedAt: string;
-    }[];
+    designs: Design[];
 };
 
 export default function NicheDetailsPage() {
@@ -82,7 +79,12 @@ export default function NicheDetailsPage() {
                 method: "POST",
                 body: JSON.stringify({ rawText: bulkText }),
             });
-            return res.json();
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed to process");
+            return data;
+        },
+        onError: (e) => {
+             toast.error(e.message || "Something went wrong", { duration: Infinity });
         },
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ["niche", id] });
@@ -255,8 +257,8 @@ export default function NicheDetailsPage() {
 
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {niche.designs
-                    .sort((a, b) => (a.design.cleanName || a.design.name).localeCompare(b.design.cleanName || b.design.name))
-                    .map(({ design }) => (
+                    .sort((a, b) => (a.cleanName || a.name).localeCompare(b.cleanName || b.name))
+                    .map((design) => (
                         <div key={design.id} className="glass-card p-5 rounded-2xl group relative hover:border-white/20">
                             <div className="font-bold truncate text-white mb-1" title={design.name}>
                                 {design.cleanName || design.name}
