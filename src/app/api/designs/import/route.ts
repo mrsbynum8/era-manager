@@ -23,7 +23,7 @@ export async function POST(req: Request) {
             return { name, cleanName };
         });
 
-        const addedDesigns = db.addDesigns(processed);
+        const addedDesigns = await db.addDesigns(processed);
         const addedCount = addedDesigns.length;
 
         // Calculate stats

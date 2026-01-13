@@ -1,168 +1,178 @@
-import fs from 'fs';
-import path from 'path';
+import { PrismaClient } from '@prisma/client';
 
-const DB_PATH = path.join(process.cwd(), 'data.json');
+// Prevent multiple instances of Prisma Client in development
+const globalForPrisma = global as unknown as { prisma: PrismaClient };
 
-export type Design = {
-    id: string;
-    name: string;
-    cleanName: string;
-    createdAt: string;
-    nicheIds: string[]; // Relationship stored here
-};
+export const prisma = globalForPrisma.prisma || new PrismaClient();
 
-export type Niche = {
-    id: string;
-    name: string;
-    description: string | null;
-    createdAt: string;
-};
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
-type Schema = {
-    designs: Design[];
-    niches: Niche[];
-};
-
-// Initial state
-const defaultData: Schema = {
-    designs: [],
-    niches: [],
-};
-
-class JSONDatabase {
-    private data: Schema | null = null;
-
-    private load() {
-        if (this.data) return this.data;
-
-        if (!fs.existsSync(DB_PATH)) {
-            this.data = defaultData;
-            this.save();
-            return this.data;
-        }
-
-        try {
-            const raw = fs.readFileSync(DB_PATH, 'utf-8');
-            this.data = JSON.parse(raw);
-        } catch (e) {
-            console.error("Failed to parse DB, resetting", e);
-            this.data = defaultData;
-        }
-        return this.data!;
-    }
-
-    private save() {
-        if (!this.data) return;
-        fs.writeFileSync(DB_PATH, JSON.stringify(this.data, null, 2), 'utf-8');
-    }
-
+export class DatabaseAdapter {
     // --- Design Methods ---
 
-    getDesigns() {
-        return this.load().designs;
+    async getDesigns() {
+        return await prisma.design.findMany({
+            include: { niches: true }
+        });
     }
 
-    addDesigns(newDesigns: { name: string; cleanName: string }[]) {
-        const data = this.load();
-        const existingNames = new Set(data.designs.map(d => d.name));
-
-        const addedDesigns: Design[] = [];
-
-        for (const d of newDesigns) {
-            if (!existingNames.has(d.name)) {
-                const newDesign: Design = {
-                    id: Math.random().toString(36).substring(2, 15),
-                    name: d.name,
-                    cleanName: d.cleanName,
-                    createdAt: new Date().toISOString(),
-                    nicheIds: []
-                };
-                data.designs.push(newDesign);
-                addedDesigns.push(newDesign);
+    async addDesigns(newDesigns: { name: string; cleanName: string }[]) {
+        const results = [];
+        
+        // Prisma doesn't support "createMany" with "skipDuplicates" on all DBs efficiently 
+        // in a way that returns the created objects easily. 
+        // For simplicity and to return the actual created objects, we'll loop.
+        // In a high-volume prod environment, we'd optimize this.
+        
+        for (const design of newDesigns) {
+            try {
+                // Upsert to ensure we don't duplicate on name
+                const d = await prisma.design.upsert({
+                    where: { name: design.name },
+                    update: {}, // Do nothing if exists
+                    create: {
+                        name: design.name,
+                        cleanName: design.cleanName,
+                    }
+                });
+                
+                // Only add to results if it was just created (approximate check based on timestamps would be complex)
+                // For this use case, we want to know what we "processed" primarily.
+                // But the calling code expects "added" designs.
+                // We'll trust upsert's behavior: if we want ONLY new ones, we might need to check existence first.
+                // Let's stick to the previous logic: check existence first to be safe and accurate about "added" count.
+            } catch (e) {
+                console.error(`Failed to add design ${design.name}`, e);
             }
         }
-        this.save();
-        return addedDesigns;
+
+        // Optimized approach for "Add only new":
+        // 1. Find existing names
+        const names = newDesigns.map(d => d.name);
+        const existing = await prisma.design.findMany({
+            where: { name: { in: names } },
+            select: { name: true }
+        });
+        const existingSet = new Set(existing.map(d => d.name));
+
+        const toCreate = newDesigns.filter(d => !existingSet.has(d.name));
+        
+        if (toCreate.length === 0) return [];
+
+        // Transaction for bulk creation to ensure atomicity isn't strictly required but good practice.
+        // `createMany` is fastest but doesn't return the objects (IDs) in standard SQL without `returning`.
+        // Prisma `createMany` returns a count.
+        
+        // We will simple map create promises.
+        const createdParams = await prisma.$transaction(
+            toCreate.map(d => prisma.design.create({
+                data: {
+                    name: d.name,
+                    cleanName: d.cleanName
+                }
+            }))
+        );
+
+        return createdParams;
     }
 
     // --- Niche Methods ---
 
-    getNiches() {
-        const data = this.load();
-        return data.niches.map(n => ({
-            ...n,
-            _count: {
-                designs: data.designs.filter(d => d.nicheIds.includes(n.id)).length
+    async getNiches() {
+        return await prisma.niche.findMany({
+            include: {
+                _count: {
+                    select: { designs: true }
+                }
             }
-        }));
+        });
     }
 
-    createNiche(name: string) {
-        const data = this.load();
-        const newNiche: Niche = {
-            id: Math.random().toString(36).substring(2, 15),
-            name,
-            description: null,
-            createdAt: new Date().toISOString()
-        };
-        data.niches.push(newNiche);
-        this.save();
-        return newNiche;
+    async createNiche(name: string) {
+        return await prisma.niche.create({
+            data: { name }
+        });
     }
 
-    getNiche(id: string) {
-        const data = this.load();
-        const niche = data.niches.find(n => n.id === id);
-        if (!niche) return null;
-
-        const assignedDesigns = data.designs
-            .filter(d => d.nicheIds.includes(id))
-            .map(d => ({
-                design: d,
-                assignedAt: new Date().toISOString() // Mock for compatibility
-            }));
-
-        return { ...niche, designs: assignedDesigns };
+    async getNiche(id: string) {
+        return await prisma.niche.findUnique({
+            where: { id },
+            include: {
+                designs: {
+                    include: {
+                        niches: true // if needed
+                    }
+                }
+            }
+        });
     }
 
     // --- Assignment Methods ---
 
-    assignDesignToNiche(designId: string, nicheId: string) {
-        const data = this.load();
-        const design = data.designs.find(d => d.id === designId);
-        if (design && !design.nicheIds.includes(nicheId)) {
-            design.nicheIds.push(nicheId);
-            this.save();
-        }
+    async assignDesignToNiche(designId: string, nicheId: string) {
+        return await prisma.niche.update({
+            where: { id: nicheId },
+            data: {
+                designs: {
+                    connect: { id: designId }
+                }
+            }
+        });
     }
 
-    removeDesignFromNiche(designId: string, nicheId: string) {
-        const data = this.load();
-        const design = data.designs.find(d => d.id === designId);
-        if (design) {
-            design.nicheIds = design.nicheIds.filter(id => id !== nicheId);
-            this.save();
-        }
+    async removeDesignFromNiche(designId: string, nicheId: string) {
+        return await prisma.niche.update({
+            where: { id: nicheId },
+            data: {
+                designs: {
+                    disconnect: { id: designId }
+                }
+            }
+        });
     }
 
     // --- Search/Organize ---
 
-    getUnassignedDesigns() {
-        return this.load().designs.filter(d => d.nicheIds.length === 0);
+    async getUnassignedDesigns() {
+        return await prisma.design.findMany({
+            where: {
+                niches: {
+                    none: {}
+                }
+            }
+        });
     }
 
-    getDuplicateDesigns() {
-        return this.load().designs.filter(d => d.nicheIds.length > 1);
+    async getDuplicateDesigns() {
+        // Prisma doesn't support filtering by relation count easily in `findMany` top-level without raw query or careful syntax
+        // But for this app size, we can fetch logic or use a specific filter if supported.
+        // Easier: Fetch all designs with niches, filter in memory. 
+        // Or better: Use Raw Query for performance, but stick to Prisma for simplicity if dataset < 10k.
+        
+        // We can use:
+        const designs = await prisma.design.findMany({
+            include: { niches: true }
+        });
+        return designs.filter(d => d.niches.length > 1);
     }
 
-    searchDesigns(query: string, excludeNicheId?: string) {
-        const lowerQ = query.toLowerCase();
-        return this.load().designs.filter(d => {
-            const matches = d.name.toLowerCase().includes(lowerQ) || d.cleanName.toLowerCase().includes(lowerQ);
-            const notInNiche = excludeNicheId ? !d.nicheIds.includes(excludeNicheId) : true;
-            return matches && notInNiche;
-        }).slice(0, 50);
+    async searchDesigns(query: string, excludeNicheId?: string) {
+        return await prisma.design.findMany({
+            where: {
+                OR: [
+                    { name: { contains: query, mode: 'insensitive' } },
+                    { cleanName: { contains: query, mode: 'insensitive' } }
+                ],
+                // AND: if exclude niche is present
+                ...(excludeNicheId ? {
+                    niches: {
+                        none: { id: excludeNicheId }
+                    }
+                } : {})
+            },
+            take: 50
+        });
     }
 }
 
-export const db = new JSONDatabase();
+export const db = new DatabaseAdapter();
