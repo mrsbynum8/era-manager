@@ -66,22 +66,23 @@ class JSONDatabase {
         const data = this.load();
         const existingNames = new Set(data.designs.map(d => d.name));
 
-        let addedCount = 0;
+        const addedDesigns: Design[] = [];
 
         for (const d of newDesigns) {
             if (!existingNames.has(d.name)) {
-                data.designs.push({
+                const newDesign: Design = {
                     id: Math.random().toString(36).substring(2, 15),
                     name: d.name,
                     cleanName: d.cleanName,
                     createdAt: new Date().toISOString(),
                     nicheIds: []
-                });
-                addedCount++;
+                };
+                data.designs.push(newDesign);
+                addedDesigns.push(newDesign);
             }
         }
         this.save();
-        return addedCount;
+        return addedDesigns;
     }
 
     // --- Niche Methods ---

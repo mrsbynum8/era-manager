@@ -23,7 +23,8 @@ export async function POST(req: Request) {
             return { name, cleanName };
         });
 
-        const addedCount = db.addDesigns(processed);
+        const addedDesigns = db.addDesigns(processed);
+        const addedCount = addedDesigns.length;
 
         // Calculate stats
         // Note: 'existing' count is approximate in this context (total input - added)
