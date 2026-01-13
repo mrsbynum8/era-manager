@@ -10,13 +10,13 @@ const openai = new OpenAI({
 export async function GET(req: Request, { params }: { params: { id: string } }) {
     try {
         const nicheId = params.id;
-        const niche = db.getNiche(nicheId);
+        const niche = await db.getNiche(nicheId);
 
         if (!niche) {
             return NextResponse.json({ error: "Niche not found" }, { status: 404 });
         }
 
-        const unassigned = db.getUnassignedDesigns();
+        const unassigned = await db.getUnassignedDesigns();
 
         // If no unassigned designs, return empty
         if (unassigned.length === 0) {

@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
 export async function GET() {
-    const designs = db.getDesigns();
-    const niches = db.getNiches();
-    const unassigned = db.getUnassignedDesigns();
+    const designs = await db.getDesigns();
+    const niches = await db.getNiches();
+    const unassigned = await db.getUnassignedDesigns();
 
     // Calculate coverage
     const assignedCount = designs.length - unassigned.length;
