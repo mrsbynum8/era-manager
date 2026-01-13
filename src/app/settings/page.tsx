@@ -86,7 +86,7 @@ export default function SettingsPage() {
                             <div>
                                 <h3 className="font-bold text-white mb-1">Database Location</h3>
                                 <p className="text-sm text-muted-foreground">
-                                    <code className="bg-black/40 px-2 py-1 rounded text-xs">data.json</code> in project root
+                                    <code className="bg-black/40 px-2 py-1 rounded text-xs">Postgres</code> (Vercel)
                                 </p>
                             </div>
                         </div>
@@ -126,11 +126,7 @@ export default function SettingsPage() {
                     </div>
                     <div className="flex justify-between">
                         <span className="text-muted-foreground">Storage</span>
-                        <span className="text-white">JSON Database</span>
-                    </div>
-                    <div className="flex justify-between">
-                        <span className="text-muted-foreground">Framework</span>
-                        <span className="text-white">Next.js 14</span>
+                        <span className="text-white">Vercel Postgres</span>
                     </div>
                 </div>
             </div>
