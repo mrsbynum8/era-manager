@@ -16,45 +16,50 @@ export async function POST(req: Request) {
         // 1. Fetch relevant data from JSON DB based on prompt type
         if (type === "niches") {
             const unassigned = await db.getUnassignedDesigns();
-            const sliced = unassigned.slice(0, 50);
-            dataContext = `Unassigned Designs (sample): ${sliced.map(d => d.name).join(", ")}`;
-            prompt = `Analyze these list of unassigned "Era" designs (e.g. "In My [X] Era") and suggest 5-10 new Niche categories to organize them into. Format as a bulleted list.`;
+            if (unassigned.length === 0) return NextResponse.json({ text: "No unassigned designs found to categorize." });
+            
+            const sliced = unassigned.slice(0, 100);
+            dataContext = `List of Designs: ${sliced.map((d: any) => d.cleanName || d.name).join(", ")}`;
+            prompt = `Analyze this list of design names and group them into 5-8 logical "Niche" categories (e.g. "Sports", "Professions", "Holidays").\nReturn the response as a formatted list with the Niche Name and 3-4 example designs from the list for each.`;
 
         } else if (type === "matching") {
             if (!context) return NextResponse.json({ error: "Context required" }, { status: 400 });
-            const unassigned = await db.getUnassignedDesigns(); // Get all to search properly
+            const unassigned = await db.getUnassignedDesigns();
+            if (unassigned.length === 0) return NextResponse.json({ text: "No unassigned designs found to search." });
+
             const nicheName = context;
 
-            // Simple heuristic search in JS to find candidates for the prompt
-            const candidates = unassigned
-                .filter(d => d.name.toLowerCase().includes(nicheName.toLowerCase()) || (d.cleanName && d.cleanName.toLowerCase().includes(nicheName.toLowerCase())))
-                .slice(0, 30);
+            // Don't pre-filter strictly. Let AI do the semantic matching.
+            // Take up to 150 designs to analyze.
+            const candidates = unassigned.slice(0, 150);
 
-            dataContext = `Candidates: ${candidates.map(d => d.name).join(", ")}`;
-            prompt = `From the list of candidates, identify which ones definitively belong to the "${nicheName}" niche. Return just the list of matches.`;
+            dataContext = `Unassigned Candidates: ${candidates.map((d: any) => d.cleanName || d.name).join(", ")}`;
+            prompt = `Analyze the list of candidates and identify which ones clearly belong to the "${nicheName}" niche.\nReturn ONLY a bulleted list of the matching design names. If none match, say "No matching designs found in the unassigned list."`;
 
         } else if (type === "missing") {
             if (!context) return NextResponse.json({ error: "Context required" }, { status: 400 });
             const nicheName = context;
 
             const allNiches = await db.getNiches();
-            const targetNiche = allNiches.find(n => n.name.toLowerCase() === nicheName.toLowerCase());
+            const targetNiche = allNiches.find((n: any) => n.name.toLowerCase() === nicheName.toLowerCase());
 
             if (targetNiche) {
                 // Fetch niche specifics to get designs
                 const nicheWithDesigns = await db.getNiche(targetNiche.id);
                 const existingDesigns = nicheWithDesigns ? nicheWithDesigns.designs : [];
-                dataContext = `Existing "${nicheName}" designs: ${existingDesigns.map(d => d.name).join(", ")}`;
+                dataContext = `Existing "${nicheName}" designs: ${existingDesigns.map((d: any) => d.name).join(", ")}`;
             } else {
                 dataContext = `Niche: ${nicheName} (No existing designs yet)`;
             }
+
+            prompt = `Based on the existing designs for the "${nicheName}" niche, suggest 10 NEW creative "In My [X] Era" design ideas that are strictly related to this niche and missing from the list.\nReturn just the list of ideas.`;
         }
 
         const completion = await openai.chat.completions.create({
-            model: "openai/gpt-3.5-turbo",
+            model: "openai/gpt-4o-mini",
             messages: [
-                { role: "system", content: "You are an expert Print-on-Demand Merch Assistant." },
-                { role: "user", content: `${prompt}\n\nContext Data:\n${dataContext}` }
+                { role: "system", content: "You are an expert Print-on-Demand Merch Assistant. You analyze design names to help organize them." },
+                { role: "user", content: `${prompt}\n\nData:\n${dataContext}` }
             ],
         });
 
