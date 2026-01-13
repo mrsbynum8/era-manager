@@ -52,15 +52,24 @@ export class DatabaseAdapter {
         }
 
         // Optimized approach for "Add only new":
+        // 0. Deduplicate input array first to prevent transaction failures
+        const uniqueInputs = new Map();
+        for (const d of newDesigns) {
+            if (!uniqueInputs.has(d.name)) {
+                uniqueInputs.set(d.name, d);
+            }
+        }
+        const uniqueStart = Array.from(uniqueInputs.values());
+
         // 1. Find existing names
-        const names = newDesigns.map(d => d.name);
+        const names = uniqueStart.map(d => d.name);
         const existing = await prisma.design.findMany({
             where: { name: { in: names } },
             select: { name: true }
         });
         const existingSet = new Set(existing.map(d => d.name));
 
-        const toCreate = newDesigns.filter(d => !existingSet.has(d.name));
+        const toCreate = uniqueStart.filter(d => !existingSet.has(d.name));
 
         if (toCreate.length === 0) return [];
 
